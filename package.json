@@ -1,0 +1,91 @@
+{
+  "name": "nutshell-vscode",
+  "displayName": "Nutshell",
+  "description": "Stream project docs to your Even Realities G2 glasses. Runs a local Nutshell server in-process and can transform your existing docs into the G2 display format via Claude Code.",
+  "version": "0.2.1",
+  "publisher": "nutshell",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "nutshell.start",     "title": "Nutshell: Start Server",             "category": "Nutshell" },
+      { "command": "nutshell.stop",      "title": "Nutshell: Stop Server",              "category": "Nutshell" },
+      { "command": "nutshell.restart",   "title": "Nutshell: Restart Server",           "category": "Nutshell" },
+      { "command": "nutshell.configure", "title": "Nutshell: Configure for Workspace",  "category": "Nutshell" },
+      { "command": "nutshell.transform", "title": "Nutshell: Transform Docs for G2",    "category": "Nutshell" },
+      { "command": "nutshell.copyKey",   "title": "Nutshell: Copy API Key",             "category": "Nutshell" },
+      { "command": "nutshell.enterKey",  "title": "Nutshell: Enter Server Key",         "category": "Nutshell" },
+      { "command": "nutshell.showBanner","title": "Nutshell: Show Address and Key",     "category": "Nutshell" },
+      { "command": "nutshell.unregister","title": "Nutshell: Unregister This Project",  "category": "Nutshell" }
+    ],
+    "configuration": {
+      "title": "Nutshell",
+      "properties": {
+        "nutshell.mode": {
+          "type": "string",
+          "enum": ["passthrough", "transform", "urlOnly"],
+          "default": "passthrough",
+          "description": "How to serve docs. passthrough: serve an existing folder as-is. transform: reformat a folder into a gitignored G2 mirror. urlOnly: no docs, just the URL relay."
+        },
+        "nutshell.sourceDocsPath": {
+          "type": "string",
+          "default": "docs",
+          "description": "Passthrough: the folder to serve. Transform: the source folder to read from."
+        },
+        "nutshell.outputDocsPath": {
+          "type": "string",
+          "default": "nutshell-docs",
+          "description": "Transform only: the generated G2-formatted mirror folder. Auto-gitignored. Change to '.nutshell-docs' for a dot-prefixed hidden folder."
+        },
+        "nutshell.port": {
+          "type": "number",
+          "default": 4242,
+          "description": "Port the server listens on."
+        },
+        "nutshell.name": {
+          "type": "string",
+          "default": "",
+          "description": "Display name on the phone. Defaults to the workspace folder name."
+        },
+        "nutshell.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the server automatically when the workspace opens."
+        },
+        "nutshell.autoTransformOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Transform mode only: re-transform a file when it's saved. Uses Claude Code credit."
+        },
+        "nutshell.ollama": {
+          "type": "boolean",
+          "default": false,
+          "description": "When spawning the server, enable the local LLM proxy via Ollama."
+        },
+        "nutshell.ollamaModel": {
+          "type": "string",
+          "default": "llama3.2:3b",
+          "description": "Ollama model for the local LLM proxy."
+        },
+        "nutshell.ollamaUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama daemon address."
+        },
+        "nutshell.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for an externally-started Nutshell server. Paste the key shown in the server's terminal output. The extension saves it to .nutshell-api-key on first use so you only need to set this once."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "nutshell-server": "file:../nutshell-server"
+  },
+  "engines_note": "node >=18 required at runtime via VS Code"
+}
