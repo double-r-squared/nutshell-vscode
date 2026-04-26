@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+*.vsix
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Claude Code / agent workspace
+.claude/
+memory/
+
+# Secrets / runtime artifacts — NEVER commit
+.nutshell-api-key
+.nutshell-server.pid
+.nutshell-server.log
+.env
+.env.*
+!.env.example
