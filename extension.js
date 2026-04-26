@@ -50,6 +50,17 @@ let keyPromptShown = false
 // machine). Disposed when leaving remote mode or on deactivate.
 let pushDriver = null
 
+// Registration toast state. Tracks the last project-id we successfully
+// registered against the current server endpoint, so we can:
+//   - Show a one-shot "registered" toast on first success per session
+//   - Show a "re-registered" toast when the server lost us and we
+//     re-pushed (typically after a server restart)
+//   - Stay silent on the steady-state heartbeats that just confirm
+//     the server still has our id.
+// Reset on any setting change that points us at a different server or
+// changes the project identity. The key is `${host}:${port}:${id}`.
+let lastRegisteredFor = null
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function log(...args) {
@@ -151,6 +162,26 @@ function disposePushDriver() {
 function statusFromRes(res) {
   if (res.status === 200) return null
   return res.error?.error || res.plaintext || `status ${res.status}`
+}
+
+// Show a toast confirming a successful project registration. Shown once
+// per server target per session (first time = "registered", subsequent
+// after a server-side eviction = "re-registered"). Steady-state
+// heartbeats that find our id already in projectIds don't toast.
+function notifyRegistered(s, { fileCount, modeLabel }) {
+  const target = `${s.host}:${s.port}:${myProjectId}`
+  const isFresh = lastRegisteredFor !== target
+  lastRegisteredFor = target
+  const where = isRemoteMode(s) ? `remote ${serverAddr(s)}` : `local server`
+  const sizeNote = typeof fileCount === 'number'
+    ? ` (${fileCount} file${fileCount !== 1 ? 's' : ''})`
+    : ''
+  const verb = isFresh ? 'Registered' : 'Re-registered'
+  const detail = isFresh
+    ? `on ${where}${modeLabel ? `, ${modeLabel}` : ''}${sizeNote}`
+    : `on ${where}${sizeNote} — server had lost the project`
+  vscode.window.showInformationMessage(`Nutshell: ${verb} project "${s.name}" ${detail}`)
+  log(`[register-toast] ${verb} "${s.name}" ${detail}`)
 }
 
 function ensurePushDriverFor(s) {
@@ -257,9 +288,11 @@ async function heartbeat() {
     if (!stillRegistered) {
       log(`server has no record of project ${myProjectId.slice(0, 8)}; pushing snapshot`)
       try {
-        await driver.snapshot()
+        const result = await driver.snapshot()
+        notifyRegistered(s, { fileCount: result.fileCount, modeLabel: 'push mode' })
       } catch (err) {
         log(`snapshot failed: ${err.message}`)
+        vscode.window.showErrorMessage(`Nutshell: failed to register "${s.name}" — ${err.message}`)
       }
     }
     return
@@ -270,6 +303,14 @@ async function heartbeat() {
   const docsPath = resolvedProjectDocsPath(s)
   if (!docsPath || !fs.existsSync(docsPath)) return
 
+  // Skip re-toasting steady-state heartbeats: only fire when our id is
+  // missing from the server's projectIds list (or projectIds isn't
+  // present, meaning an older server that always re-registers).
+  const fsTarget = `${s.host}:${s.port}:${myProjectId}`
+  const fsAlreadyKnown = Array.isArray(health.projectIds)
+    ? health.projectIds.includes(myProjectId)
+    : lastRegisteredFor === fsTarget
+
   try {
     const res = await registerProject(s.host, s.port, apiKey, {
       id: myProjectId,
@@ -279,6 +320,14 @@ async function heartbeat() {
     if (res.status !== 200) {
       const detail = res.error?.error || `status ${res.status}`
       log(`heartbeat register failed: ${detail}`)
+      return
+    }
+    if (!fsAlreadyKnown) {
+      notifyRegistered(s, { modeLabel: 'fs mode' })
+    } else {
+      // Steady-state success — keep the cached registration target up to
+      // date so the next genuine eviction toasts as "re-registered".
+      lastRegisteredFor = fsTarget
     }
   } catch (err) {
     log(`heartbeat register failed: ${err.message}`)
@@ -518,6 +567,7 @@ async function useLocalServer() {
   await config.update('host', 'localhost', vscode.ConfigurationTarget.Workspace)
   log('switched to local mode')
   disposePushDriver()
+  lastRegisteredFor = null
   lastProbedHealth = null
   updateStatusBar()
   await heartbeat()
@@ -1071,8 +1121,10 @@ async function activate(context) {
       // Any nutshell.* change invalidates the push driver's view of the
       // workspace (host, key, source roots, mode). Recreate it on the
       // next heartbeat with fresh settings rather than try to mutate it
-      // in place.
+      // in place. Reset the registration-toast cache too so the next
+      // successful register on the (potentially new) target shows.
       disposePushDriver()
+      lastRegisteredFor = null
       // Rebuild fs-mode symlinks only when relevant — push mode doesn't
       // need them.
       const s = settings()
