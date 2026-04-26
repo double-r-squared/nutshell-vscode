@@ -4,6 +4,10 @@
   "description": "Stream project docs to your Even Realities G2 glasses. Runs a local Nutshell server in-process and can transform your existing docs into the G2 display format via Claude Code.",
   "version": "0.2.1",
   "publisher": "nutshell",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/double-r-squared/nutshell-vscode.git"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -83,9 +87,6 @@
         }
       }
     }
-  },
-  "dependencies": {
-    "nutshell-server": "file:../nutshell-server"
   },
   "engines_note": "node >=18 required at runtime via VS Code"
 }
