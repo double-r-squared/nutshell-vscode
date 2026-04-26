@@ -3,3 +3,10 @@ node_modules/**
 **/*.map
 .git/**
 .gitignore
+.nutshell-server.log
+.nutshell-server.pid
+.nutshell-api-key
+.nutshell-docs-root/**
+**/*.log
+*.vsix
+memory/**

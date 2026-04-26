@@ -2,7 +2,7 @@
   "name": "nutshell-vscode",
   "displayName": "Nutshell",
   "description": "Stream project docs to your Even Realities G2 glasses. Runs a local Nutshell server in-process and can transform your existing docs into the G2 display format via Claude Code.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "publisher": "nutshell",
   "repository": {
     "type": "git",
@@ -14,17 +14,28 @@
   "categories": ["Other"],
   "activationEvents": ["onStartupFinished"],
   "main": "./extension.js",
+  "scripts": {
+    "package": "vsce package --allow-missing-repository --skip-license",
+    "build": "bash scripts/build.sh",
+    "build:install": "bash scripts/build.sh --install",
+    "build:reload": "bash scripts/build.sh --install --reload"
+  },
   "contributes": {
     "commands": [
-      { "command": "nutshell.start",     "title": "Nutshell: Start Server",             "category": "Nutshell" },
-      { "command": "nutshell.stop",      "title": "Nutshell: Stop Server",              "category": "Nutshell" },
-      { "command": "nutshell.restart",   "title": "Nutshell: Restart Server",           "category": "Nutshell" },
-      { "command": "nutshell.configure", "title": "Nutshell: Configure for Workspace",  "category": "Nutshell" },
-      { "command": "nutshell.transform", "title": "Nutshell: Transform Docs for G2",    "category": "Nutshell" },
-      { "command": "nutshell.copyKey",   "title": "Nutshell: Copy API Key",             "category": "Nutshell" },
-      { "command": "nutshell.enterKey",  "title": "Nutshell: Enter Server Key",         "category": "Nutshell" },
-      { "command": "nutshell.showBanner","title": "Nutshell: Show Address and Key",     "category": "Nutshell" },
-      { "command": "nutshell.unregister","title": "Nutshell: Unregister This Project",  "category": "Nutshell" }
+      { "command": "nutshell.start",         "title": "Nutshell: Start Local Server",        "category": "Nutshell" },
+      { "command": "nutshell.stop",          "title": "Nutshell: Stop Local Server",         "category": "Nutshell" },
+      { "command": "nutshell.restart",       "title": "Nutshell: Restart Local Server",      "category": "Nutshell" },
+      { "command": "nutshell.connectRemote", "title": "Nutshell: Connect to Remote Server",  "category": "Nutshell" },
+      { "command": "nutshell.useLocal",      "title": "Nutshell: Use Local Server",          "category": "Nutshell" },
+      { "command": "nutshell.configure",     "title": "Nutshell: Configure for Workspace",   "category": "Nutshell" },
+      { "command": "nutshell.transform",     "title": "Nutshell: Transform Docs for G2",     "category": "Nutshell" },
+      { "command": "nutshell.copyKey",       "title": "Nutshell: Copy API Key",              "category": "Nutshell" },
+      { "command": "nutshell.enterKey",      "title": "Nutshell: Enter Server Key",          "category": "Nutshell" },
+      { "command": "nutshell.showBanner",    "title": "Nutshell: Show Address and Key",      "category": "Nutshell" },
+      { "command": "nutshell.unregister",    "title": "Nutshell: Unregister This Project",   "category": "Nutshell" },
+      { "command": "nutshell.discover",      "title": "Nutshell: Discover Doc Folders",      "category": "Nutshell" },
+      { "command": "nutshell.addDocSource",  "title": "Nutshell: Add Doc Source Folder",     "category": "Nutshell" },
+      { "command": "nutshell.manageSources", "title": "Nutshell: Manage Doc Sources",        "category": "Nutshell" }
     ],
     "configuration": {
       "title": "Nutshell",
@@ -45,10 +56,21 @@
           "default": "nutshell-docs",
           "description": "Transform only: the generated G2-formatted mirror folder. Auto-gitignored. Change to '.nutshell-docs' for a dot-prefixed hidden folder."
         },
+        "nutshell.serverMode": {
+          "type": "string",
+          "enum": ["local", "remote"],
+          "default": "local",
+          "description": "local: this extension can spawn and stop a Nutshell server in the workspace. remote: only connect to an externally-managed server at host:port — Start/Stop/Restart are disabled and auto-start is suppressed."
+        },
+        "nutshell.host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "Host the extension connects to. Defaults to localhost for local mode. In remote mode, set this via the 'Connect to Remote Server' command."
+        },
         "nutshell.port": {
           "type": "number",
           "default": 4242,
-          "description": "Port the server listens on."
+          "description": "Port the server listens on (local mode) or the remote server's port (remote mode)."
         },
         "nutshell.name": {
           "type": "string",
@@ -79,6 +101,12 @@
           "type": "string",
           "default": "http://localhost:11434",
           "description": "Ollama daemon address."
+        },
+        "nutshell.docSources": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "List of doc folders (relative to workspace root) to aggregate under one project. Each folder is symlinked into a virtual root (.nutshell-docs-root/) that the server serves. When non-empty, overrides sourceDocsPath. Example: [\"docs\", \"notes\", \"specs\", \"packages/auth/docs\"]."
         },
         "nutshell.apiKey": {
           "type": "string",
