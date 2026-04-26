@@ -52,8 +52,10 @@ pick a mode, run. Or **Nutshell: Start Server** to just launch the server.
 │
 ├── lib/
 │   ├── crypto.js          # Node PSK AES-GCM (mirrors nutshell-server/lib/crypto.js)
-│   ├── server-client.js   # probe/spawn/kill the server; registerProject/unregisterProject
+│   ├── server-client.js   # probe/spawn/kill server; register / push / admin endpoints
 │   ├── project-id.js      # ensure UUID in .vscode/nutshell-project-id
+│   ├── doc-sources.js     # multi-folder symlink root + resolveDocSources helper
+│   ├── push-driver.js     # remote-mode chokidar watcher + snapshot/upsert/delete
 │   ├── transform.js       # spawn `claude -p` per file, write reformatted output
 │   ├── gitignore.js       # ensure transform output folder is gitignored
 │   └── claude-md.js       # append "nutshell mirror" harness to CLAUDE.md
@@ -94,12 +96,27 @@ read .nutshell-api-key                wait for /health
      │                                       │
      └───────────────────┬───────────────────┘
                          ▼
-             POST /projects/register {id, name, docsPath}
-                         │
+            ┌────────────┴────────────┐
+            │                         │
+       fs mode (local)         push mode (remote)
+            │                         │
+            ▼                         ▼
+   POST /projects/register    POST /projects/register
+   {id, name, docsPath}       {id, name, files: [...]}
+                                      │
+                                      ▼
+                              chokidar watches local
+                              source roots; on change
+                              POST /projects/files/upsert
+                              on unlink
+                              POST /projects/files/delete
+            │                         │
+            └────────────┬────────────┘
                          ▼
                  30 s heartbeat timer
-                 (idempotent re-register,
-                  refresh status bar)
+                 — fs mode: idempotent re-register
+                 — push mode: re-snapshot only when our
+                   id is missing from /health.projectIds
 ```
 
 On `deactivate`: best-effort `POST /projects/unregister`. The server stays
@@ -129,14 +146,44 @@ Status bar stays in the "server up, no project" state so the user can tell.
 
 ### Modes (`nutshell.mode` setting)
 
-| Mode | Server `docsPath` | Use when |
+| Mode | Source folder | Use when |
 |---|---|---|
 | `passthrough` | `<workspace>/<sourceDocsPath>` | You have a docs folder already in the right shape |
 | `transform` | `<workspace>/<outputDocsPath>` | You want to reformat existing docs into a G2-friendly mirror |
 | `urlOnly` | `null` | Workspace isn't a docs project — just want browser-extension URL relay |
 
-Changing `nutshell.*` settings auto-restarts the server (via
-`onDidChangeConfiguration`).
+Changing `nutshell.*` settings disposes the push driver (in remote mode)
+and triggers a fresh heartbeat — the next register snapshots with the
+new settings (via `onDidChangeConfiguration`).
+
+### Server modes (`nutshell.serverMode` setting)
+
+This setting decides whether the extension talks to a local server it
+can spawn, or a remote one it can only call. It also drives **how**
+project files reach the server:
+
+| Server mode | How files get there | Live updates |
+|---|---|---|
+| `local`  | `POST /projects/register {docsPath}`. Server reads disk via chokidar. | Server's chokidar broadcasts file events. |
+| `remote` | `POST /projects/register {files: [...]}` snapshot, then `POST /projects/files/upsert` and `/delete` per change. Server caches in memory. | Extension's chokidar (in `lib/push-driver.js`) watches local source roots and pushes events. |
+
+Push mode (remote) doesn't materialize the `.nutshell-docs-root/` symlink
+folder on disk — it walks the configured source roots directly and namespaces
+file IDs the same way (`<linkName>/<rel>` for multi-source, bare relative
+path for single-source) so the phone sees the same content layout in either
+mode.
+
+The push driver's lifecycle:
+
+- Created lazily on the first remote-mode heartbeat.
+- `snapshot()` scans every source root, `POST /projects/register` with the
+  full set, then starts the chokidar watcher (with `awaitWriteFinish` so
+  half-saved files aren't read).
+- Subsequent heartbeats are no-ops as long as our project's UUID is in
+  `health.projectIds`. If the server restarts and the id is gone, the
+  next heartbeat re-snapshots and re-pushes everything.
+- Disposed on serverMode flip, deactivate, or any `nutshell.*` config
+  change (so the next heartbeat rebuilds with fresh settings).
 
 ### Project identity
 

@@ -12,9 +12,11 @@ const {
   VIRTUAL_ROOT,
   rebuildVirtualRoot,
   removeVirtualRoot,
+  resolveDocSources,
   discoverDocFolders,
   countMdFiles,
 } = require('./lib/doc-sources')
+const { createPushDriver } = require('./lib/push-driver')
 const {
   probeHealth,
   readKey,
@@ -27,6 +29,8 @@ const {
   waitForHealthy,
   registerProject,
   unregisterProject,
+  pushUpsertFile,
+  pushDeleteFile,
   adminShutdown,
   adminRestart,
 } = require('./lib/server-client')
@@ -40,6 +44,11 @@ let heartbeatHandle = null
 let lastProbedHealth = null
 let myProjectId = null
 let keyPromptShown = false
+
+// Push driver — only active in remote mode. Watches local files and
+// streams them to the server (which can't see the local fs from another
+// machine). Disposed when leaving remote mode or on deactivate.
+let pushDriver = null
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -84,11 +93,14 @@ function serverAddr(s) {
   return `${s.host}:${s.port}`
 }
 
+// Resolve the single docs path used in fs (local-server) mode. Push mode
+// doesn't need this — the push driver scans source roots directly. In fs
+// mode the symlink virtual root is rebuilt so the server can chokidar one
+// path that fans out via symlinks.
 function resolvedProjectDocsPath(s) {
   if (!s.root) return null
   if (s.mode === 'urlOnly') return null
 
-  // When docSources is populated, use the virtual symlink root.
   if (s.docSources.length > 0) {
     const virtualRoot = rebuildVirtualRoot(s.root, s.docSources)
     if (virtualRoot) {
@@ -120,6 +132,70 @@ function updateStatusBar() {
   }
   statusBarItem.command = 'nutshell.showMenu'
   statusBarItem.show()
+}
+
+// ── Push driver lifecycle ────────────────────────────────────────────────────
+//
+// Created lazily on first remote-mode heartbeat. Watches the workspace's
+// configured source roots and streams files to the server. Callbacks read
+// fresh settings + key on every fire so config changes don't leave the
+// driver pointing at stale host/key/projectId.
+
+function disposePushDriver() {
+  if (pushDriver) {
+    try { pushDriver.dispose() } catch {}
+    pushDriver = null
+  }
+}
+
+function statusFromRes(res) {
+  if (res.status === 200) return null
+  return res.error?.error || res.plaintext || `status ${res.status}`
+}
+
+function ensurePushDriverFor(s) {
+  if (pushDriver) return pushDriver
+  pushDriver = createPushDriver({
+    workspaceRoot: s.root,
+    settings: {
+      docSources: s.docSources,
+      sourceDocsPath: s.sourceDocsPath,
+      outputDocsPath: s.outputDocsPath,
+      mode: s.mode,
+    },
+    resolveDocSources,
+    log,
+    onSnapshotPush: async (files) => {
+      const cur = settings()
+      const key = readKey(cur.root) || cur.apiKey
+      if (!key) throw new Error('no API key available')
+      if (!myProjectId) myProjectId = ensureProjectId(cur.root)
+      const res = await registerProject(cur.host, cur.port, key, {
+        id: myProjectId,
+        name: cur.name,
+        files,
+      })
+      const fail = statusFromRes(res)
+      if (fail) throw new Error(typeof fail === 'string' ? fail : JSON.stringify(fail))
+    },
+    onFileUpsert: async (file) => {
+      const cur = settings()
+      const key = readKey(cur.root) || cur.apiKey
+      if (!key || !myProjectId) return
+      const res = await pushUpsertFile(cur.host, cur.port, key, myProjectId, file)
+      const fail = statusFromRes(res)
+      if (fail) throw new Error(typeof fail === 'string' ? fail : JSON.stringify(fail))
+    },
+    onFileDelete: async (fileId) => {
+      const cur = settings()
+      const key = readKey(cur.root) || cur.apiKey
+      if (!key || !myProjectId) return
+      const res = await pushDeleteFile(cur.host, cur.port, key, myProjectId, fileId)
+      const fail = statusFromRes(res)
+      if (fail) throw new Error(typeof fail === 'string' ? fail : JSON.stringify(fail))
+    },
+  })
+  return pushDriver
 }
 
 // ── Heartbeat: probe health + keep our project registered ────────────────────
@@ -163,16 +239,47 @@ async function heartbeat() {
   }
   keyPromptShown = false
 
-  const docsPath = resolvedProjectDocsPath(s)
-  if (!docsPath || !fs.existsSync(docsPath)) return
   if (!myProjectId) myProjectId = ensureProjectId(s.root)
 
+  if (isRemoteMode(s)) {
+    // Push mode: server can't see the local fs. Ensure the driver is
+    // running, then snapshot only when the server has lost our project
+    // (first connect, after restart, etc.). Every other heartbeat is a
+    // no-op so we don't re-upload the full file set every 30 s.
+    let driver
+    try {
+      driver = ensurePushDriverFor(s)
+    } catch (err) {
+      log(`push driver create failed: ${err.message}`)
+      return
+    }
+    const stillRegistered = Array.isArray(health.projectIds) && health.projectIds.includes(myProjectId)
+    if (!stillRegistered) {
+      log(`server has no record of project ${myProjectId.slice(0, 8)}; pushing snapshot`)
+      try {
+        await driver.snapshot()
+      } catch (err) {
+        log(`snapshot failed: ${err.message}`)
+      }
+    }
+    return
+  }
+
+  // Local (fs) mode — unchanged behavior.
+  disposePushDriver()
+  const docsPath = resolvedProjectDocsPath(s)
+  if (!docsPath || !fs.existsSync(docsPath)) return
+
   try {
-    await registerProject(s.host, s.port, apiKey, {
+    const res = await registerProject(s.host, s.port, apiKey, {
       id: myProjectId,
       name: s.name,
       docsPath,
     })
+    if (res.status !== 200) {
+      const detail = res.error?.error || `status ${res.status}`
+      log(`heartbeat register failed: ${detail}`)
+    }
   } catch (err) {
     log(`heartbeat register failed: ${err.message}`)
   }
@@ -410,6 +517,7 @@ async function useLocalServer() {
   await config.update('serverMode', 'local', vscode.ConfigurationTarget.Workspace)
   await config.update('host', 'localhost', vscode.ConfigurationTarget.Workspace)
   log('switched to local mode')
+  disposePushDriver()
   lastProbedHealth = null
   updateStatusBar()
   await heartbeat()
@@ -530,7 +638,7 @@ async function discoverDocFoldersCommand() {
 
   // Rebuild symlinks immediately.
   rebuildVirtualRoot(root, selected)
-  ensureGitignoreEntry(root, VIRTUAL_ROOT)
+  ensureGitignoreEntry(root, { dir: VIRTUAL_ROOT }, '# Nutshell — symlinked doc-sources virtual root')
 
   const count = selected.length
   vscode.window.showInformationMessage(
@@ -573,7 +681,7 @@ async function addDocSourceCommand() {
   log(`added doc source: ${relPath}`)
 
   rebuildVirtualRoot(root, updated)
-  ensureGitignoreEntry(root, VIRTUAL_ROOT)
+  ensureGitignoreEntry(root, { dir: VIRTUAL_ROOT }, '# Nutshell — symlinked doc-sources virtual root')
 
   vscode.window.showInformationMessage(`Added ${relPath} to doc sources.`)
   await heartbeat()
@@ -652,6 +760,87 @@ async function manageDocSourcesCommand() {
   await heartbeat()
 }
 
+// ── Status bar menu ──────────────────────────────────────────────────────────
+//
+// Two-tier QuickPick. The top tier shows only what users do day-to-day.
+// Lifecycle, key management, and unregister live in a Server… submenu.
+// "Configure for workspace" only appears until the user has actually
+// configured nutshell.* in this workspace — once `nutshell.mode` has a
+// workspaceValue, it disappears so it doesn't clutter the menu forever.
+
+function isWorkspaceConfigured() {
+  const cfg = vscode.workspace.getConfiguration('nutshell')
+  return cfg.inspect('mode')?.workspaceValue !== undefined
+}
+
+async function showStatusBarMenu() {
+  const s = settings()
+  const docSourceLabel = s.docSources.length > 0
+    ? `$(folder-library) Manage doc sources (${s.docSources.length})`
+    : '$(folder-library) Manage doc sources'
+
+  const items = []
+  if (!isWorkspaceConfigured()) {
+    items.push({ label: '$(gear) Configure for workspace', value: 'configure' })
+  }
+  items.push(
+    { label: docSourceLabel, value: 'manageSources' },
+    { label: '$(sparkle) Transform docs for G2', value: 'transform' },
+    { label: '', kind: vscode.QuickPickItemKind.Separator },
+    { label: '$(server) Server…', description: serverAddr(s), value: 'submenu:server' },
+    { label: '$(settings-gear) Open Nutshell settings', value: 'openSettings' },
+  )
+
+  const pick = await vscode.window.showQuickPick(items, { placeHolder: 'Nutshell' })
+  if (!pick || !pick.value) return
+  if (pick.value === 'submenu:server') {
+    await showServerSubmenu()
+    return
+  }
+  if (pick.value === 'openSettings') {
+    await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:nutshell.nutshell-vscode')
+    return
+  }
+  await vscode.commands.executeCommand(`nutshell.${pick.value}`)
+}
+
+async function showServerSubmenu() {
+  const s = settings()
+  const remote = isRemoteMode(s)
+  const reachable = lastProbedHealth?.ok
+
+  const items = []
+  if (remote) {
+    items.push(
+      { label: '$(plug) Connect to a different remote…', description: serverAddr(s), value: 'connectRemote' },
+      reachable ? { label: '$(debug-stop) Shut down remote server', value: 'stop' } : null,
+      reachable ? { label: '$(refresh) Restart remote server', value: 'restart' } : null,
+      { label: '$(home) Switch to local server', value: 'useLocal' },
+    )
+  } else {
+    items.push(
+      reachable
+        ? { label: '$(debug-stop) Stop local server (tracked)', value: 'stop' }
+        : { label: '$(play) Start local server', value: 'start' },
+      { label: '$(refresh) Restart local server', value: 'restart' },
+      { label: '$(plug) Connect to remote server…', value: 'connectRemote' },
+    )
+  }
+  items.push(
+    { label: '', kind: vscode.QuickPickItemKind.Separator },
+    { label: '$(clippy) Copy API key', value: 'copyKey' },
+    { label: '$(key) Enter server key', value: 'enterKey' },
+    { label: '$(info) Show address and key', value: 'showBanner' },
+    { label: '$(trash) Unregister this project', value: 'unregister' },
+  )
+
+  const pick = await vscode.window.showQuickPick(items.filter(Boolean), {
+    placeHolder: remote ? `Nutshell · remote (${serverAddr(s)})` : 'Nutshell · local server',
+  })
+  if (!pick || !pick.value) return
+  await vscode.commands.executeCommand(`nutshell.${pick.value}`)
+}
+
 // ── Configuration flow ────────────────────────────────────────────────────────
 
 async function configureWorkspace() {
@@ -718,7 +907,7 @@ async function configureWorkspace() {
     await config.update('mode', 'transform', vscode.ConfigurationTarget.Workspace)
     await config.update('sourceDocsPath', src, vscode.ConfigurationTarget.Workspace)
     await config.update('outputDocsPath', out, vscode.ConfigurationTarget.Workspace)
-    ensureGitignoreEntry(root, out)
+    ensureGitignoreEntry(root, { dir: out }, '# Nutshell — auto-generated G2-formatted docs')
     ensureClaudeMdHarness(root, { sourceDir: src, outputDir: out })
 
     const shouldTransform = await vscode.window.showInformationMessage(
@@ -872,60 +1061,30 @@ async function activate(context) {
   register('nutshell.discover', discoverDocFoldersCommand)
   register('nutshell.addDocSource', addDocSourceCommand)
   register('nutshell.manageSources', manageDocSourcesCommand)
-  register('nutshell.showMenu', async () => {
-    const s = settings()
-    const remote = isRemoteMode(s)
-    const docSourceLabel = s.docSources.length > 0
-      ? `$(folder-library) Manage doc sources (${s.docSources.length})`
-      : '$(folder-library) Manage doc sources'
-    const items = remote
-      ? [
-          { label: '$(plug) Connect to remote server…', description: serverAddr(s), value: 'connectRemote' },
-          lastProbedHealth?.ok
-            ? { label: '$(debug-stop) Shut down remote server', value: 'stop' }
-            : null,
-          lastProbedHealth?.ok
-            ? { label: '$(refresh) Restart remote server', value: 'restart' }
-            : null,
-          { label: '$(home) Switch to local server', value: 'useLocal' },
-          { label: '$(gear) Configure for workspace', value: 'configure' },
-          { label: docSourceLabel, value: 'manageSources' },
-          { label: '$(sparkle) Transform docs for G2', value: 'transform' },
-          { label: '$(clippy) Copy API key', value: 'copyKey' },
-          { label: '$(key) Enter server key', value: 'enterKey' },
-          { label: '$(info) Show address and key', value: 'showBanner' },
-          { label: '$(trash) Unregister this project', value: 'unregister' },
-        ].filter(Boolean)
-      : [
-          lastProbedHealth?.ok
-            ? { label: '$(debug-stop) Stop local server (tracked)', value: 'stop' }
-            : { label: '$(play) Start local server', value: 'start' },
-          { label: '$(refresh) Restart local server', value: 'restart' },
-          { label: '$(plug) Connect to remote server…', value: 'connectRemote' },
-          { label: '$(gear) Configure for workspace', value: 'configure' },
-          { label: docSourceLabel, value: 'manageSources' },
-          { label: '$(sparkle) Transform docs for G2', value: 'transform' },
-          { label: '$(clippy) Copy API key', value: 'copyKey' },
-          { label: '$(key) Enter server key', value: 'enterKey' },
-          { label: '$(info) Show address and key', value: 'showBanner' },
-          { label: '$(trash) Unregister this project', value: 'unregister' },
-        ]
-    const pick = await vscode.window.showQuickPick(items, { placeHolder: 'Nutshell' })
-    if (!pick) return
-    await vscode.commands.executeCommand(`nutshell.${pick.value}`)
-  })
+  register('nutshell.showMenu', showStatusBarMenu)
 
   updateStatusBar()
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(async (e) => {
       if (!e.affectsConfiguration('nutshell')) return
-      // Rebuild symlinks when docSources changes.
+      // Any nutshell.* change invalidates the push driver's view of the
+      // workspace (host, key, source roots, mode). Recreate it on the
+      // next heartbeat with fresh settings rather than try to mutate it
+      // in place.
+      disposePushDriver()
+      // Rebuild fs-mode symlinks only when relevant — push mode doesn't
+      // need them.
       const s = settings()
-      if (s.root && s.docSources.length > 0) {
+      if (s.root && !isRemoteMode(s) && s.docSources.length > 0) {
         rebuildVirtualRoot(s.root, s.docSources)
         ensureGitignoreEntry(s.root, VIRTUAL_ROOT)
-      } else if (s.root) {
+      } else if (s.root && !isRemoteMode(s)) {
+        removeVirtualRoot(s.root)
+      } else if (s.root && isRemoteMode(s)) {
+        // Push mode doesn't use the virtual root; remove a leftover from
+        // a previous local-mode session so it doesn't masquerade as a
+        // real folder.
         removeVirtualRoot(s.root)
       }
       setupAutoTransform(context)
@@ -935,12 +1094,27 @@ async function activate(context) {
 
   setupAutoTransform(context)
 
-  // If docSources is configured, ensure the virtual root and gitignore are
-  // set up on activation (handles workspace reopen, new clone, etc.).
   const s = settings()
-  if (s.root && s.docSources.length > 0) {
+
+  // Auto-gitignore the workspace files this extension writes that should
+  // never be committed. Idempotent — adds only what's missing.
+  if (s.root) {
+    ensureGitignoreEntry(
+      s.root,
+      [
+        { file: '.nutshell-api-key' },
+        { file: '.nutshell-server.pid' },
+        { file: '.nutshell-server.log' },
+      ],
+      '# Nutshell — local server state and API key',
+    )
+  }
+
+  // fs-mode startup only: prebuild the virtual root if docSources is set.
+  // Push mode skips this — the driver scans source folders directly.
+  if (s.root && !isRemoteMode(s) && s.docSources.length > 0) {
     rebuildVirtualRoot(s.root, s.docSources)
-    ensureGitignoreEntry(s.root, VIRTUAL_ROOT)
+    ensureGitignoreEntry(s.root, { dir: VIRTUAL_ROOT }, '# Nutshell — symlinked doc-sources virtual root')
   }
 
   if (s.autoStart && s.root && !isRemoteMode(s)) {
@@ -951,6 +1125,7 @@ async function activate(context) {
 
 async function deactivate() {
   stopHeartbeat()
+  disposePushDriver()
   // Best-effort unregister. Don't kill the server — it survives VS Code close
   // on purpose, so the phone stays connected.
   const s = settings()
