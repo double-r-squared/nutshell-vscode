@@ -1,7 +1,7 @@
 # Nutshell — VS Code Extension
 
 Registers your workspace's docs folder with a running
-[`nutshell-server`](../nutshell-server) so it shows up as a `<Name> (N)` row
+`nutshell-server` so it shows up as a `<Name> (N)` row
 on your G2 glasses. Also auto-spawns the server if none is running, copies API
 keys, transforms existing docs into G2-friendly format, and more.
 
