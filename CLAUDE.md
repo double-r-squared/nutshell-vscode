@@ -50,8 +50,10 @@ If the heartbeat silently stops registering:
 
 ## Memory
 
-`memory/` is your private scratch (gitignored). Project knowledge goes in
-AGENTS.md and docs/; never copy memory content into project docs.
+The assistant's structured scratch lives in
+[`../loggingagent.md`](../loggingagent.md) at the workspace root.
+Project knowledge goes in AGENTS.md and docs/; never copy logging-agent
+content into project docs.
 
 ## Style
 
