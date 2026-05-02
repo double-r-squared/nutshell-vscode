@@ -4,6 +4,12 @@
   "description": "Stream project docs to your Even Realities G2 glasses. Runs a local Nutshell server in-process and can transform your existing docs into the G2 display format via Claude Code.",
   "version": "0.4.3",
   "publisher": "nutshell",
+  "license": "MIT",
+  "icon": "icon.png",
+  "homepage": "https://github.com/double-r-squared/nutshell-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/double-r-squared/nutshell-vscode/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/double-r-squared/nutshell-vscode.git"
@@ -11,11 +17,20 @@
   "engines": {
     "vscode": "^1.80.0"
   },
-  "categories": ["Other"],
+  "categories": ["Other", "Notebooks"],
+  "keywords": [
+    "even-realities",
+    "g2",
+    "smart-glasses",
+    "ar",
+    "documentation",
+    "heads-up-display",
+    "nutshell"
+  ],
   "activationEvents": ["onStartupFinished"],
   "main": "./extension.js",
   "scripts": {
-    "package": "vsce package --allow-missing-repository --skip-license",
+    "package": "vsce package",
     "build": "bash scripts/build.sh",
     "build:install": "bash scripts/build.sh --install",
     "build:reload": "bash scripts/build.sh --install --reload"

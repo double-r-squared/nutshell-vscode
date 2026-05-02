@@ -1,6 +1,7 @@
 .vscode/**
 **/*.map
 .git/**
+.github/**
 .gitignore
 .nutshell-server.log
 .nutshell-server.pid
@@ -9,6 +10,14 @@
 **/*.log
 *.vsix
 memory/**
+
+# Internal docs — for contributors / agents, not for the public listing.
+AGENTS.md
+CLAUDE.md
+docs/**
+
+# Dev scripts (the reload helper; users get the published flow)
+scripts/**
 
 # node_modules: exclude everything by default, then re-include the
 # runtime deps the extension needs at execution time.
