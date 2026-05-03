@@ -24,6 +24,11 @@ usage long enough that pre-1.0 versioning no longer reflects reality.
 - Server install instructions switched from the misleading
   `npm install -g nutshell-server` (the server isn't on the npm registry)
   to a `git clone` + `npm install` + `node bin/cli.js` flow.
+- README icon swapped to a transparent green variant (`icon-green.png`)
+  so the brand reads against GitHub's dark theme header. The
+  Marketplace icon (`icon.png`, still wired through `package.json`)
+  stays black-on-white so it doesn't disappear into a light-mode
+  marketplace card.
 
 ## 0.4.3 — Initial public release
 
