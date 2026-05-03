@@ -8,6 +8,11 @@
   Read your project's docs hands-free on Even Realities G2 smart glasses.
 </p>
 
+
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode"><img src="https://img.shields.io/badge/Install-VS%20Code%20Marketplace-blue" alt="Install on Marketplace" /></a>
+</p>
+
 Drops a Nutshell row on your glasses for every VS Code window you open. Pick
 **passthrough** to serve your existing `docs/` folder as-is, **transform** to
 reformat your docs into a glasses-friendly mirror via Claude Code, or **URL
@@ -15,10 +20,6 @@ relay only** if you just want to ship browser-extension URLs through this
 window's machine. Multiple VS Code windows share one local Nutshell server; a
 30-second heartbeat keeps the project list on the phone in sync without manual
 re-mapping.
-
-<p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode"><img src="https://img.shields.io/badge/Install-VS%20Code%20Marketplace-blue" alt="Install on Marketplace" /></a>
-</p>
 
 > **What this isn't.** Nutshell only makes sense if you own a pair of Even
 > Realities G2 smart glasses. Without the glasses + the companion phone app,
