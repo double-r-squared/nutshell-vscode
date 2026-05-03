@@ -2,11 +2,13 @@
   <img src="./icon.png" width="128" height="128" alt="Nutshell" />
 </p>
 
+
+<h1 align="center">Nutshell</h1>
+
+
 <p align="center">
   <a href="https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode"><img src="https://img.shields.io/badge/Install-VS%20Code%20Marketplace-blue" alt="Install on Marketplace" /></a>
 </p>
-
-<h1 align="center">Nutshell</h1>
 
 <p align="center">
   Read your project's docs hands-free on Even Realities G2 smart glasses.
