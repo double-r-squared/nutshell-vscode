@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./icon-green.png" width="128" height="128" alt="Nutshell" />
+  <img src="./icon.png" width="128" height="128" alt="Nutshell" />
 </p>
 
 

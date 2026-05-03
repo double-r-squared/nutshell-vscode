@@ -2,6 +2,17 @@
 
 All notable changes to the Nutshell VS Code extension are documented here.
 
+## 1.4.5 — Marketplace icon swap
+
+The marketplace listing's icon now uses the same transparent-green
+pixel-art mark the README and the website's favicon ship. The
+black-on-white variant disappeared into the dark-theme marketplace
+cards; the green variant reads on either theme. Single icon file now
+(`icon.png`) — the README and `package.json` both point to it; the
+parallel `icon-green.png` was removed since they were identical.
+
+No code changes; no extension behavior changes.
+
 ## 1.4.4 — Stable release
 
 First release as 1.x. The codebase has been driving real glasses-on-the-face
