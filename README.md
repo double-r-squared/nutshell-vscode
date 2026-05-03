@@ -97,13 +97,12 @@ glasses:
   laptop sleeps recover automatically; no manual re-mapping.
 - Server survives VS Code closing; stops when every client unregisters.
 
-## Sibling components
+## The four pieces of Nutshell
 
-Nutshell is four moving pieces; this extension is one of them.
-
-- **[nutshell-server](https://github.com/double-r-squared/nutshell-server)** — the local server every other piece talks to. Runs on your machine; encrypted PSK transport over plain HTTP.
-- **[nutshell-browser](https://github.com/double-r-squared/nutshell-browser)** — Chrome / Firefox / Safari extension. One-click send the current tab's URL to your glasses for hands-free reading later.
-- **Nutshell** — the phone app that pairs with the glasses and renders content from the server.
+- **Nutshell** — the phone app, available on Even Hub. Pairs with the G2 glasses and renders everything you see.
+- **[nutshell-server](https://github.com/double-r-squared/nutshell-server)** — the local server the phone app connects to. Required.
+- **nutshell-vscode** *(this one)* — the VS Code extension. Streams your project's docs to the glasses while you code.
+- **[nutshell-browser](https://github.com/double-r-squared/nutshell-browser)** — the browser extension. One-click sends the current tab to your glasses for later reading.
 
 ## Commands
 
