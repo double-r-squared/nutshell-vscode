@@ -8,11 +8,7 @@
   Read your project's docs hands-free on Even Realities G2 smart glasses.
 </p>
 
-<p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode">VS Code Marketplace</a>
-  ·
-  <a href="#">Chrome Web Store (coming soon)</a>
-</p>
+[![Install on Marketplace](https://img.shields.io/badge/Install-VS%20Code%20Marketplace-blue)](https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode)
 
 Drops a Nutshell row on your glasses for every VS Code window you open. Pick
 **passthrough** to serve your existing `docs/` folder as-is, **transform** to
@@ -25,10 +21,6 @@ re-mapping.
 > **What this isn't.** Nutshell only makes sense if you own a pair of Even
 > Realities G2 smart glasses. Without the glasses + the companion phone app,
 > the extension has nothing to send to.
-
-## Install
-
-[![Install on Marketplace](https://img.shields.io/badge/Install-VS%20Code%20Marketplace-blue)](https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode)
 
 Or from VS Code: `Cmd+Shift+P` → **Extensions: Install Extensions** → search
 "Nutshell". Or grab the latest `.vsix` from the
