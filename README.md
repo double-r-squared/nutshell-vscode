@@ -28,7 +28,9 @@ re-mapping.
 
 ## Install
 
-From VS Code: `Cmd+Shift+P` → **Extensions: Install Extensions** → search
+[![Install on Marketplace](https://img.shields.io/badge/Install-VS%20Code%20Marketplace-blue)](https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode)
+
+Or from VS Code: `Cmd+Shift+P` → **Extensions: Install Extensions** → search
 "Nutshell". Or grab the latest `.vsix` from the
 [Releases](https://github.com/double-r-squared/nutshell-vscode/releases) page.
 
