@@ -1,7 +1,26 @@
-# Nutshell for VS Code
+<p align="center">
+  <img src="./icon.png" width="128" height="128" alt="Nutshell" />
+</p>
 
-Stream your project's docs to **Even Realities G2 smart glasses** — read your
-spec, your notes, your README, hands-free, while you keep working in the editor.
+<h1 align="center">Nutshell</h1>
+
+<p align="center">
+  Read your project's docs hands-free on Even Realities G2 smart glasses.
+</p>
+
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode">VS Code Marketplace</a>
+  ·
+  <a href="#">Chrome Web Store (coming soon)</a>
+</p>
+
+Drops a Nutshell row on your glasses for every VS Code window you open. Pick
+**passthrough** to serve your existing `docs/` folder as-is, **transform** to
+reformat your docs into a glasses-friendly mirror via Claude Code, or **URL
+relay only** if you just want to ship browser-extension URLs through this
+window's machine. Multiple VS Code windows share one local Nutshell server; a
+30-second heartbeat keeps the project list on the phone in sync without manual
+re-mapping.
 
 > **What this isn't.** Nutshell only makes sense if you own a pair of Even
 > Realities G2 smart glasses. Without the glasses + the companion phone app,
@@ -9,19 +28,21 @@ spec, your notes, your README, hands-free, while you keep working in the editor.
 
 ## Install
 
-[![Install on Marketplace](https://img.shields.io/badge/Install-VS%20Code%20Marketplace-blue)](https://marketplace.visualstudio.com/items?itemName=nutshell.nutshell-vscode)
-
-Or from VS Code: `Cmd+Shift+P` → **Extensions: Install Extensions** → search
-"Nutshell".
+From VS Code: `Cmd+Shift+P` → **Extensions: Install Extensions** → search
+"Nutshell". Or grab the latest `.vsix` from the
+[Releases](https://github.com/double-r-squared/nutshell-vscode/releases) page.
 
 ## 30-second quickstart
 
-1. **Install the server.** In a terminal (any project, doesn't have to match
-   your VS Code workspace):
+1. **Install the server.** It lives at
+   [github.com/double-r-squared/nutshell-server](https://github.com/double-r-squared/nutshell-server).
+   Clone it anywhere on your machine:
 
    ```bash
-   npm install -g nutshell-server
-   nutshell-server
+   git clone https://github.com/double-r-squared/nutshell-server.git
+   cd nutshell-server
+   npm install
+   node bin/cli.js
    ```
 
    The server's startup banner prints a QR code with the host + API key. Keep
@@ -82,7 +103,7 @@ Nutshell is four moving pieces; this extension is one of them.
 
 - **[nutshell-server](https://github.com/double-r-squared/nutshell-server)** — the local server every other piece talks to. Runs on your machine; encrypted PSK transport over plain HTTP.
 - **[nutshell-browser](https://github.com/double-r-squared/nutshell-browser)** — Chrome / Firefox / Safari extension. One-click send the current tab's URL to your glasses for hands-free reading later.
-- **Nutshell phone app** *(Even Realities G2 marketplace)* — the companion app that pairs with the glasses and renders content from the server.
+- **Nutshell** — the phone app that pairs with the glasses and renders content from the server.
 
 ## Commands
 
