@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  [![Install on Marketplace](https://img.shields.io/badge/Install-VS%20Code%20Marketplace-blue)](https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode)
+[![Install on Marketplace](https://img.shields.io/badge/Install-VS%20Code%20Marketplace-blue)](https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode)
 </p>
 
 
