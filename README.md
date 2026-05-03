@@ -8,7 +8,10 @@
   Read your project's docs hands-free on Even Realities G2 smart glasses.
 </p>
 
-[![Install on Marketplace](https://img.shields.io/badge/Install-VS%20Code%20Marketplace-blue)](https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode)
+<p align="center">
+  [![Install on Marketplace](https://img.shields.io/badge/Install-VS%20Code%20Marketplace-blue)](https://marketplace.visualstudio.com/items?itemName=nutshell-app.nutshell-vscode)
+</p>
+
 
 Drops a Nutshell row on your glasses for every VS Code window you open. Pick
 **passthrough** to serve your existing `docs/` folder as-is, **transform** to
